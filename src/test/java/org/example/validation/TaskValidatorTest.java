@@ -31,10 +31,10 @@ class TaskValidatorTest {
     @Test
     void acceptsTaskWithAllFields() {
         Task t = TaskValidator.fromJson(json("""
-                {"title":"Estudiar","description":"Java","status":"In Progress","priority":"High"}
+                {"title":"Study","description":"Java","status":"In Progress","priority":"High"}
                 """));
 
-        assertEquals("Estudiar", t.getTitle());
+        assertEquals("Study", t.getTitle());
         assertEquals("Java", t.getDescription());
         assertEquals(TaskStatus.IN_PROGRESS, t.getStatus());
         assertEquals(TaskPriority.HIGH, t.getPriority());
@@ -42,7 +42,7 @@ class TaskValidatorTest {
 
     @Test
     void usesDefaultsWhenStatusAndPriorityAreMissing() {
-        Task t = TaskValidator.fromJson(json("{\"title\":\"Solo título\"}"));
+        Task t = TaskValidator.fromJson(json("{\"title\":\"Title only\"}"));
 
         assertEquals(TaskStatus.PENDING, t.getStatus());
         assertEquals(TaskPriority.MEDIUM, t.getPriority());
@@ -51,8 +51,8 @@ class TaskValidatorTest {
 
     @Test
     void trimsTitle() {
-        Task t = TaskValidator.fromJson(json("{\"title\":\"   Hola   \"}"));
-        assertEquals("Hola", t.getTitle());
+        Task t = TaskValidator.fromJson(json("{\"title\":\"   Hello   \"}"));
+        assertEquals("Hello", t.getTitle());
     }
 
     @Test
@@ -89,17 +89,17 @@ class TaskValidatorTest {
 
     @Test
     void rejectsMissingTitle() {
-        assertTrue(errorOf("{}").contains("obligatorio"));
+        assertTrue(errorOf("{}").contains("required"));
     }
 
     @Test
     void rejectsNullTitle() {
-        assertTrue(errorOf("{\"title\":null}").contains("obligatorio"));
+        assertTrue(errorOf("{\"title\":null}").contains("required"));
     }
 
     @Test
     void rejectsBlankTitle() {
-        assertTrue(errorOf("{\"title\":\"    \"}").contains("obligatorio"));
+        assertTrue(errorOf("{\"title\":\"    \"}").contains("required"));
     }
 
     @Test
@@ -116,18 +116,18 @@ class TaskValidatorTest {
 
     @Test
     void rejectsTitleThatIsNotText() {
-        assertTrue(errorOf("{\"title\":123}").contains("texto"));
+        assertTrue(errorOf("{\"title\":123}").contains("text"));
     }
 
     @Test
     void rejectsUnknownStatus() {
         String message = errorOf("{\"title\":\"x\",\"status\":\"Done\"}");
-        assertTrue(message.contains("Pending"), "El mensaje debe listar los valores permitidos");
+        assertTrue(message.contains("Pending"), "The message must list the allowed values");
     }
 
     @Test
     void rejectsUnknownPriority() {
         String message = errorOf("{\"title\":\"x\",\"priority\":\"Urgent\"}");
-        assertTrue(message.contains("Low, Medium, High"), "El mensaje debe listar los valores permitidos");
+        assertTrue(message.contains("Low, Medium, High"), "The message must list the allowed values");
     }
 }

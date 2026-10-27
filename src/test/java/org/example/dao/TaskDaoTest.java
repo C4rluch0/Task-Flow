@@ -57,7 +57,7 @@ class TaskDaoTest {
     private Task newTask(String title, TaskStatus status, TaskPriority priority) {
         Task t = new Task();
         t.setTitle(title);
-        t.setDescription("Descripción de " + title);
+        t.setDescription("Description of " + title);
         t.setStatus(status);
         t.setPriority(priority);
         return t;
@@ -67,11 +67,11 @@ class TaskDaoTest {
 
     @Test
     void createAssignsIdAndCreationDate() throws SQLException {
-        Task created = dao.create(newTask("Primera", TaskStatus.PENDING, TaskPriority.MEDIUM));
+        Task created = dao.create(newTask("First", TaskStatus.PENDING, TaskPriority.MEDIUM));
 
         assertNotNull(created.getId());
         assertNotNull(created.getCreatedAt());
-        assertEquals("Primera", created.getTitle());
+        assertEquals("First", created.getTitle());
         assertEquals(TaskStatus.PENDING, created.getStatus());
         assertEquals(TaskPriority.MEDIUM, created.getPriority());
     }
@@ -91,14 +91,14 @@ class TaskDaoTest {
 
     @Test
     void findAllReturnsNewestFirst() throws SQLException {
-        dao.create(newTask("Primera", TaskStatus.PENDING, TaskPriority.LOW));
-        dao.create(newTask("Segunda", TaskStatus.PENDING, TaskPriority.LOW));
+        dao.create(newTask("First", TaskStatus.PENDING, TaskPriority.LOW));
+        dao.create(newTask("Second", TaskStatus.PENDING, TaskPriority.LOW));
 
         List<Task> tasks = dao.findAll(null);
 
         assertEquals(2, tasks.size());
-        assertEquals("Segunda", tasks.get(0).getTitle());
-        assertEquals("Primera", tasks.get(1).getTitle());
+        assertEquals("Second", tasks.get(0).getTitle());
+        assertEquals("First", tasks.get(1).getTitle());
     }
 
     @Test
@@ -117,11 +117,11 @@ class TaskDaoTest {
 
     @Test
     void findByIdReturnsTaskWhenItExists() throws SQLException {
-        Task created = dao.create(newTask("Buscar", TaskStatus.IN_PROGRESS, TaskPriority.HIGH));
+        Task created = dao.create(newTask("Lookup", TaskStatus.IN_PROGRESS, TaskPriority.HIGH));
 
         Task found = dao.findById(created.getId()).orElseThrow();
 
-        assertEquals("Buscar", found.getTitle());
+        assertEquals("Lookup", found.getTitle());
         assertEquals(TaskStatus.IN_PROGRESS, found.getStatus());
         assertEquals(TaskPriority.HIGH, found.getPriority());
     }
@@ -137,23 +137,23 @@ class TaskDaoTest {
     void updateChangesAllFields() throws SQLException {
         Task created = dao.create(newTask("Original", TaskStatus.PENDING, TaskPriority.LOW));
 
-        created.setTitle("Modificada");
-        created.setDescription("Nueva descripción");
+        created.setTitle("Modified");
+        created.setDescription("New description");
         created.setStatus(TaskStatus.COMPLETED);
         created.setPriority(TaskPriority.HIGH);
 
         assertTrue(dao.update(created));
 
         Task reloaded = dao.findById(created.getId()).orElseThrow();
-        assertEquals("Modificada", reloaded.getTitle());
-        assertEquals("Nueva descripción", reloaded.getDescription());
+        assertEquals("Modified", reloaded.getTitle());
+        assertEquals("New description", reloaded.getDescription());
         assertEquals(TaskStatus.COMPLETED, reloaded.getStatus());
         assertEquals(TaskPriority.HIGH, reloaded.getPriority());
     }
 
     @Test
     void updateReturnsFalseWhenTaskDoesNotExist() throws SQLException {
-        Task ghost = newTask("Fantasma", TaskStatus.PENDING, TaskPriority.LOW);
+        Task ghost = newTask("Ghost", TaskStatus.PENDING, TaskPriority.LOW);
         ghost.setId(999_999L);
 
         assertFalse(dao.update(ghost));
@@ -163,7 +163,7 @@ class TaskDaoTest {
 
     @Test
     void deleteRemovesTheTask() throws SQLException {
-        Task created = dao.create(newTask("Borrar", TaskStatus.PENDING, TaskPriority.LOW));
+        Task created = dao.create(newTask("Remove", TaskStatus.PENDING, TaskPriority.LOW));
 
         assertTrue(dao.delete(created.getId()));
         assertTrue(dao.findById(created.getId()).isEmpty());

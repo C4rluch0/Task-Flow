@@ -1,0 +1,5 @@
+# Send Docker only what the build needs (pom.xml and the source code).
+# Everything else (target/, data/, .git/, .idea/, ...) stays out of the build context.
+*
+!pom.xml
+!src

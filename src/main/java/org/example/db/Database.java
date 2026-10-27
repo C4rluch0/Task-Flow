@@ -5,6 +5,13 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+/**
+ * Centraliza la conexión a H2 y la creación de la tabla.
+ *
+ * La ruta del archivo es RELATIVA al directorio desde donde se ejecuta la app
+ * (por defecto ./data/taskflow), así cualquier persona puede correr el proyecto.
+ * Se puede cambiar con la variable de entorno TF_DB_PATH.
+ */
 public class Database {
 
     private static final String DB_PATH = resolveDbPath();
@@ -23,13 +30,19 @@ public class Database {
         try {
             Class.forName("org.h2.Driver");
         } catch (ClassNotFoundException e) {
-            throw new IllegalStateException("No se encontró el driver de H2 en el classpath", e);
+            throw new IllegalStateException("H2 driver not found on the classpath", e);
         }
     }
 
     private Database() {
     }
 
+    /**
+     * Orden de prioridad para la ruta del archivo:
+     *   1. Propiedad del sistema -Dtf.db.path (la define el plugin Cargo en el pom.xml)
+     *   2. Variable de entorno TF_DB_PATH
+     *   3. Valor por defecto: ./data/taskflow
+     */
     private static String resolveDbPath() {
         String path = System.getProperty("tf.db.path");
         if (path == null || path.isBlank()) {
@@ -59,7 +72,7 @@ public class Database {
         try (Connection con = get(); Statement st = con.createStatement()) {
             st.execute(sql);
         } catch (SQLException e) {
-            throw new IllegalStateException("No se pudo inicializar la base de datos", e);
+            throw new IllegalStateException("Could not initialize the database", e);
         }
     }
 }

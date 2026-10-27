@@ -1,0 +1,13 @@
+services:
+  taskflow:
+    build: .
+    image: taskflow:1.0
+    container_name: taskflow
+    ports:
+      - "8080:8080"              # host:container
+    volumes:
+      - taskflow-data:/data      # keeps the H2 database between restarts
+    restart: unless-stopped
+
+volumes:
+  taskflow-data:

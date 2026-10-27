@@ -19,6 +19,15 @@ import java.sql.SQLException;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * API REST de tareas:
+ *   GET    /api/tasks               -> lista todas
+ *   GET    /api/tasks?status=Pending -> lista filtrando por estado
+ *   GET    /api/tasks/{id}          -> una tarea
+ *   POST   /api/tasks               -> crea
+ *   PUT    /api/tasks/{id}          -> actualiza
+ *   DELETE /api/tasks/{id}          -> elimina
+ */
 @WebServlet("/api/tasks/*")
 public class TaskServlet extends HttpServlet {
 
@@ -37,7 +46,7 @@ public class TaskServlet extends HttpServlet {
             if (task.isPresent()) {
                 sendJson(resp, 200, task.get());
             } else {
-                sendError(resp, 404, "Tarea no encontrada");
+                sendError(resp, 404, "Task not found");
             }
         } catch (IllegalArgumentException e) {
             sendError(resp, 400, e.getMessage());
@@ -63,7 +72,7 @@ public class TaskServlet extends HttpServlet {
         try {
             Long id = parseId(req);
             if (id == null) {
-                sendError(resp, 400, "Falta el ID en la URL");
+                sendError(resp, 400, "Missing ID in the URL");
                 return;
             }
             Task task = TaskValidator.fromJson(readJsonBody(req));
@@ -72,7 +81,7 @@ public class TaskServlet extends HttpServlet {
                 // Se vuelve a leer para devolver también la fecha de creación
                 sendJson(resp, 200, dao.findById(id).orElse(task));
             } else {
-                sendError(resp, 404, "Tarea no encontrada");
+                sendError(resp, 404, "Task not found");
             }
         } catch (IllegalArgumentException e) {
             sendError(resp, 400, e.getMessage());
@@ -86,13 +95,13 @@ public class TaskServlet extends HttpServlet {
         try {
             Long id = parseId(req);
             if (id == null) {
-                sendError(resp, 400, "Falta el ID en la URL");
+                sendError(resp, 400, "Missing ID in the URL");
                 return;
             }
             if (dao.delete(id)) {
                 resp.setStatus(204); // sin contenido
             } else {
-                sendError(resp, 404, "Tarea no encontrada");
+                sendError(resp, 404, "Task not found");
             }
         } catch (IllegalArgumentException e) {
             sendError(resp, 400, e.getMessage());
@@ -101,6 +110,9 @@ public class TaskServlet extends HttpServlet {
         }
     }
 
+    // ---------- Métodos auxiliares ----------
+
+    /** Extrae el id de /api/tasks/5. Devuelve null si no hay id. */
     private Long parseId(HttpServletRequest req) {
         String path = req.getPathInfo();
         if (path == null || path.equals("/")) {
@@ -109,10 +121,11 @@ public class TaskServlet extends HttpServlet {
         try {
             return Long.parseLong(path.substring(1));
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("ID inválido");
+            throw new IllegalArgumentException("Invalid ID");
         }
     }
 
+    /** Lee ?status=... de la URL. Devuelve null si no viene. */
     private TaskStatus parseStatusFilter(HttpServletRequest req) {
         String status = req.getParameter("status");
         if (status == null || status.isBlank()) {
@@ -121,16 +134,17 @@ public class TaskServlet extends HttpServlet {
         return TaskStatus.fromLabel(status);
     }
 
+    /** Lee el cuerpo de la petición y verifica que sea un objeto JSON. */
     private JsonObject readJsonBody(HttpServletRequest req) throws IOException {
         req.setCharacterEncoding("UTF-8");
         try {
             JsonElement element = JsonParser.parseReader(req.getReader());
             if (!element.isJsonObject()) {
-                throw new IllegalArgumentException("El cuerpo debe ser un objeto JSON");
+                throw new IllegalArgumentException("The request body must be a JSON object");
             }
             return element.getAsJsonObject();
         } catch (JsonParseException e) {
-            throw new IllegalArgumentException("JSON inválido");
+            throw new IllegalArgumentException("Invalid JSON");
         }
     }
 
@@ -146,7 +160,7 @@ public class TaskServlet extends HttpServlet {
     }
 
     private void serverError(HttpServletResponse resp, SQLException e) throws IOException {
-        log("Error de base de datos", e);
-        sendError(resp, 500, "Error interno del servidor");
+        log("Database error", e);
+        sendError(resp, 500, "Internal server error");
     }
 }

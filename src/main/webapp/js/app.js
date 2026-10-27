@@ -5,9 +5,20 @@ const API = 'api/tasks';
 const STATUSES = ['Pending', 'In Progress', 'Completed'];
 
 const $ = (id) => document.getElementById(id);
+const dialog = $('task-dialog');
 
 let currentFilter = '';   // '' = todas
 let toastTimer = null;
+let pressStartedOnBackdrop = false;
+
+// Iconos: SVG fijo escrito aquí (no contiene datos del usuario, por eso es seguro usar innerHTML)
+const SVG_ATTRS = 'viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false" ' +
+    'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+const ICON_EDIT = '<svg ' + SVG_ATTRS + '><path d="M13.5 3.5l3 3L7 16H4v-3z"/></svg>';
+const ICON_DELETE = '<svg ' + SVG_ATTRS + '><path d="M4 6h12M8 6V4h4v2M6 6l.8 10.5h6.4L14 6"/></svg>';
+const ICON_EMPTY = '<svg viewBox="0 0 48 48" width="48" height="48" aria-hidden="true" focusable="false" ' +
+    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<rect x="10" y="8" width="28" height="34" rx="4"/><path d="M18 8V6h12v2M17 22l3 3 6-6M17 33h14"/></svg>';
 
 // ---------- Comunicación con el backend ----------
 
@@ -19,7 +30,7 @@ async function request(url, options = {}) {
             ...options
         });
     } catch (e) {
-        throw new Error('No se pudo conectar con el servidor. Comprueba que la aplicación esté en ejecución.');
+        throw new Error('Could not reach the server. Make sure the application is running.');
     }
 
     if (res.status === 204) return null;      // DELETE no devuelve cuerpo
@@ -28,20 +39,23 @@ async function request(url, options = {}) {
     try { data = await res.json(); } catch (e) { /* la respuesta no era JSON */ }
 
     if (!res.ok) {
-        throw new Error((data && data.error) || 'Error inesperado (' + res.status + ')');
+        throw new Error((data && data.error) || 'Unexpected error (' + res.status + ')');
     }
     return data;
 }
 
 // ---------- Mensajes ----------
 
+// Si la ventana del formulario está abierta, el error se muestra dentro de ella
 function showError(message) {
-    $('error-text').textContent = message;
-    $('error').hidden = false;
+    const id = dialog.open ? 'form-error' : 'error';
+    $(id + '-text').textContent = message;
+    $(id).hidden = false;
 }
 
 function clearError() {
     $('error').hidden = true;
+    $('form-error').hidden = true;
 }
 
 // Aviso breve que desaparece solo
@@ -54,7 +68,7 @@ function showToast(message) {
 }
 
 // ---------- Utilidades para construir el DOM ----------
-// Se usa textContent (nunca innerHTML) para que el texto del usuario no se ejecute como HTML.
+// Para texto del usuario se usa textContent (nunca innerHTML), así no se ejecuta como HTML.
 
 function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -63,13 +77,27 @@ function el(tag, className, text) {
     return node;
 }
 
+function iconButton(icon, className, title, label) {
+    const button = el('button', 'icon-btn ' + className);
+    button.type = 'button';
+    button.title = title;
+    button.setAttribute('aria-label', label);
+    button.innerHTML = icon;
+    return button;
+}
+
 function slug(text) {
     return text.toLowerCase().replace(/\s+/g, '-');
 }
 
+function formatDay(iso) {
+    const date = new Date(iso);
+    return isNaN(date) ? '' : date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 function formatDate(iso) {
     const date = new Date(iso);
-    return isNaN(date) ? '' : date.toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' });
+    return isNaN(date) ? '' : date.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 // ---------- Listado ----------
@@ -89,39 +117,59 @@ function renderTasks(tasks) {
 
     $('count').textContent = tasks.length;
     $('count').hidden = false;
+    $('list-head').hidden = (tasks.length === 0);
 
     if (tasks.length === 0) {
-        const message = currentFilter
-            ? 'No hay tareas con estado ' + currentFilter + '.'
-            : 'Todavía no hay tareas. Crea la primera con el formulario.';
-        list.appendChild(el('li', 'empty', message));
+        list.appendChild(createEmptyState());
         return;
     }
-
     tasks.forEach((task) => list.appendChild(createTaskItem(task)));
 }
 
+function createEmptyState() {
+    const li = el('li', 'empty');
+
+    const icon = el('div', 'empty-icon');
+    icon.innerHTML = ICON_EMPTY;
+    li.appendChild(icon);
+
+    if (currentFilter) {
+        li.appendChild(el('p', 'empty-title', 'No results'));
+        li.appendChild(el('p', null, 'No tasks with status ' + currentFilter + '.'));
+    } else {
+        li.appendChild(el('p', 'empty-title', 'No tasks yet'));
+        li.appendChild(el('p', null, "Create the first one to start organizing your team's work."));
+        const button = el('button', 'btn btn-primary', 'Create task');
+        button.type = 'button';
+        button.addEventListener('click', openCreate);
+        li.appendChild(button);
+    }
+    return li;
+}
+
 function createTaskItem(task) {
-    const li = el('li', 'task prio-' + task.priority.toLowerCase());
+    const li = el('li', 'task');
     if (task.status === 'Completed') li.classList.add('is-completed');
 
-    // Información de la tarea
-    const main = el('div', 'task-main');
+    // Columna 1: título y descripción
+    const main = el('div', 'cell-main');
     main.appendChild(el('h3', 'task-title', task.title));
     if (task.description) {
-        main.appendChild(el('p', 'task-desc', task.description));
+        const desc = el('p', 'task-desc', task.description);
+        desc.title = task.description;   // el texto completo se ve al pasar el cursor
+        main.appendChild(desc);
     }
-    const meta = el('p', 'task-meta');
-    meta.appendChild(el('span', null, 'Prioridad: ' + task.priority));
-    const created = formatDate(task.createdAt);
-    if (created) meta.appendChild(el('span', null, 'Creada: ' + created));
-    main.appendChild(meta);
 
-    // Acciones normales
-    const actions = el('div', 'task-actions');
+    // Columnas 2 a 4: prioridad, estado y fecha
+    const meta = el('div', 'task-meta');
+
+    const prio = el('span', 'prio prio-' + task.priority.toLowerCase());
+    prio.appendChild(el('span', 'sr-only', 'Priority '));
+    prio.appendChild(document.createTextNode(task.priority));
+    meta.appendChild(prio);
 
     const select = el('select', 'status-select status-' + slug(task.status));
-    select.setAttribute('aria-label', 'Estado de la tarea ' + task.title);
+    select.setAttribute('aria-label', 'Status of task ' + task.title);
     STATUSES.forEach((status) => {
         const option = el('option', null, status);
         option.value = status;
@@ -135,34 +183,41 @@ function createTaskItem(task) {
             description: task.description,
             priority: task.priority,
             status: select.value
-        }, 'Estado actualizado');
+        }, 'Status updated');
     });
-    actions.appendChild(select);
+    meta.appendChild(select);
 
-    const editBtn = el('button', 'btn btn-secondary btn-small', 'Editar');
-    editBtn.type = 'button';
+    const date = el('span', 'cell-date', formatDay(task.createdAt));
+    date.title = formatDate(task.createdAt);
+    meta.appendChild(date);
+
+    // Columna 5: acciones
+    const cell = el('div', 'cell-actions');
+    const actions = el('div', 'task-actions');
+
+    const editBtn = iconButton(ICON_EDIT, '', 'Edit', 'Edit task ' + task.title);
     editBtn.addEventListener('click', () => startEdit(task));
     actions.appendChild(editBtn);
 
-    const deleteBtn = el('button', 'btn btn-secondary btn-small btn-danger', 'Eliminar');
-    deleteBtn.type = 'button';
+    const deleteBtn = iconButton(ICON_DELETE, 'icon-btn-danger', 'Delete', 'Delete task ' + task.title);
     actions.appendChild(deleteBtn);
 
     // Confirmación de borrado dentro de la propia fila (reemplaza a las acciones)
     const confirmBox = el('div', 'task-confirm');
     confirmBox.hidden = true;
-    confirmBox.appendChild(el('span', null, '¿Eliminar esta tarea?'));
+    confirmBox.appendChild(el('span', null, 'Delete this task?'));
 
-    const yesBtn = el('button', 'btn btn-danger-solid btn-small', 'Eliminar');
+    const yesBtn = el('button', 'btn btn-danger-solid btn-small', 'Delete');
     yesBtn.type = 'button';
     yesBtn.addEventListener('click', () => removeTask(task));
     confirmBox.appendChild(yesBtn);
 
-    const noBtn = el('button', 'btn btn-secondary btn-small', 'Cancelar');
+    const noBtn = el('button', 'btn btn-secondary btn-small', 'Cancel');
     noBtn.type = 'button';
     noBtn.addEventListener('click', () => {
         confirmBox.hidden = true;
         actions.hidden = false;
+        li.classList.remove('confirming');
         deleteBtn.focus();
     });
     confirmBox.appendChild(noBtn);
@@ -170,12 +225,16 @@ function createTaskItem(task) {
     deleteBtn.addEventListener('click', () => {
         actions.hidden = true;
         confirmBox.hidden = false;
+        li.classList.add('confirming');
         noBtn.focus();   // el foco empieza en la opción segura
     });
 
+    cell.appendChild(actions);
+    cell.appendChild(confirmBox);
+
     li.appendChild(main);
-    li.appendChild(actions);
-    li.appendChild(confirmBox);
+    li.appendChild(meta);
+    li.appendChild(cell);
     return li;
 }
 
@@ -206,22 +265,20 @@ async function removeTask(task) {
         clearError();
         await request(API + '/' + task.id, { method: 'DELETE' });
         ok = true;
-        if ($('task-id').value === String(task.id)) resetForm();   // se estaba editando esa tarea
     } catch (e) {
         showError(e.message);
     }
     await loadTasks();
-    if (ok) showToast('Tarea eliminada');
+    if (ok) showToast('Task deleted');
 }
 
-// ---------- Formulario ----------
+// ---------- Ventana del formulario ----------
 
 // Ajusta títulos y botones según se esté creando o editando
 function updateFormMode() {
     const editing = Boolean($('task-id').value);
-    $('form-title').textContent = editing ? 'Editar tarea #' + $('task-id').value : 'Nueva tarea';
-    $('submit-btn').textContent = editing ? 'Guardar cambios' : 'Crear tarea';
-    $('cancel').hidden = !editing;
+    $('form-title').textContent = editing ? 'Edit task #' + $('task-id').value : 'New task';
+    $('submit-btn').textContent = editing ? 'Save changes' : 'Create task';
 }
 
 function updateCounters() {
@@ -238,19 +295,6 @@ function setTitleError(message) {
     $('title').setAttribute('aria-invalid', String(hasError));
 }
 
-function startEdit(task) {
-    $('task-id').value = task.id;
-    $('title').value = task.title;
-    $('description').value = task.description || '';
-    $('priority').value = task.priority;
-    $('status').value = task.status;
-    setTitleError('');
-    updateFormMode();
-    updateCounters();
-    $('form-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    $('title').focus();
-}
-
 function resetForm() {
     $('task-form').reset();
     $('task-id').value = '';
@@ -259,10 +303,31 @@ function resetForm() {
     updateCounters();
 }
 
+function openCreate() {
+    resetForm();
+    clearError();
+    dialog.showModal();
+    $('title').focus();
+}
+
+function startEdit(task) {
+    resetForm();
+    clearError();
+    $('task-id').value = task.id;
+    $('title').value = task.title;
+    $('description').value = task.description || '';
+    $('priority').value = task.priority;
+    $('status').value = task.status;
+    updateFormMode();
+    updateCounters();
+    dialog.showModal();
+    $('title').focus();
+}
+
 function setSaving(saving) {
     $('submit-btn').disabled = saving;
     if (saving) {
-        $('submit-btn').textContent = 'Guardando…';
+        $('submit-btn').textContent = 'Saving…';
     } else {
         updateFormMode();
     }
@@ -275,7 +340,7 @@ $('task-form').addEventListener('submit', async (event) => {
 
     const title = $('title').value.trim();
     if (!title) {
-        setTitleError('Escribe un título para la tarea.');
+        setTitleError('Please enter a title for the task.');
         $('title').focus();
         return;
     }
@@ -288,15 +353,10 @@ $('task-form').addEventListener('submit', async (event) => {
         description: $('description').value.trim(),
         priority: $('priority').value,
         status: $('status').value
-    }, editing ? 'Cambios guardados' : 'Tarea creada');
+    }, editing ? 'Changes saved' : 'Task created');
     setSaving(false);
 
-    if (ok) resetForm();   // si falló, se conserva lo escrito para poder corregirlo
-});
-
-// Escape cancela la edición
-$('task-form').addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && $('task-id').value) resetForm();
+    if (ok) dialog.close();   // si falló, la ventana sigue abierta con lo escrito para poder corregirlo
 });
 
 $('title').addEventListener('input', () => {
@@ -305,7 +365,20 @@ $('title').addEventListener('input', () => {
 });
 $('description').addEventListener('input', updateCounters);
 
-$('cancel').addEventListener('click', resetForm);
+$('new-btn').addEventListener('click', openCreate);
+$('cancel').addEventListener('click', () => dialog.close());
+$('dialog-close').addEventListener('click', () => dialog.close());
+
+// Al cerrar la ventana (botones, tecla Escape o clic fuera) se limpia el formulario
+dialog.addEventListener('close', resetForm);
+
+// Clic en el fondo oscuro cierra la ventana (solo si el clic empezó y terminó allí,
+// para no perder lo escrito al soltar el ratón fuera después de seleccionar texto)
+dialog.addEventListener('mousedown', (event) => { pressStartedOnBackdrop = (event.target === dialog); });
+dialog.addEventListener('click', (event) => {
+    if (event.target === dialog && pressStartedOnBackdrop) dialog.close();
+});
+
 $('error-close').addEventListener('click', clearError);
 
 document.querySelectorAll('.chip').forEach((chip) => {

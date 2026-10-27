@@ -39,8 +39,22 @@ Para detener el servidor, pulsa `Ctrl+C` en la terminal.
 Notas:
 
 - La base de datos se crea sola en `data/taskflow.mv.db` la primera vez que arranca la aplicación (junto con la tabla `tasks`). No hay que ejecutar ningún script.
-- Los datos **se conservan** al reiniciar la aplicación e incluso después de `mvn clean`, porque la base vive en `data` y no en `target`.
+- Los datos **se conservan** al reiniciar la aplicación e incluso después de `mvn clean`, porque la base vive en `data/` y no en `target/`.
 - Las pruebas se ejecutan automáticamente con `package`. Para arrancar sin ejecutarlas: `mvn clean package cargo:run -DskipTests`.
+
+## Ejecutar con Docker (alternativa)
+
+Si prefieres no instalar JDK ni Maven, solo necesitas **Docker**:
+
+```
+docker compose up --build
+```
+
+Cuando termine de construir y arrancar, abre **http://localhost:8080/TaskFlow/**.
+
+- La base de datos se guarda en un volumen de Docker (`taskflow-data`), así que **los datos sobreviven** a reinicios y a `docker compose down`. Para borrarlos: `docker compose down -v`.
+- Sin Compose: `docker build -t taskflow .` y luego `docker run -d --name taskflow -p 8080:8080 -v taskflow-data:/data taskflow`.
+- Desde otro dispositivo de la misma red: `http://<IP-del-equipo>:8080/TaskFlow/`.
 
 ## Ejecutar las pruebas
 
@@ -56,7 +70,7 @@ Son 31 pruebas automatizadas:
 | `TaskEnumsTest` | 5 | Conversión y rechazo de estados y prioridades |
 | `TaskDaoTest` | 11 | CRUD, filtro por estado, orden, inyección SQL y restricciones, contra H2 real |
 
-Las pruebas del DAO usan una base aparte (`target/test-db`) y nunca tocan los datos de `data`.
+Las pruebas del DAO usan una base aparte (`target/test-db`) y nunca tocan los datos de `data/`.
 
 ## Ver la base de datos
 
@@ -96,7 +110,7 @@ Base: `http://localhost:8080/TaskFlow/api/tasks`
 
 `PUT` reemplaza todos los campos editables (`title`, `description`, `status`, `priority`).
 
-**Errores.** Siempre devuelven JSON con la forma `{"error": "mensaje"}`:
+**Errores.** Siempre devuelven JSON con la forma `{"error": "mensaje"}`. La interfaz y los mensajes de la API están en inglés:
 
 | Código | Cuándo |
 |---|---|
@@ -123,6 +137,8 @@ Respuesta:
 ```
 TaskFlow/
 ├── pom.xml
+├── Dockerfile                     ← imagen del contenedor (construcción en dos etapas)
+├── docker-compose.yml             ← arranque con un solo comando y volumen para los datos
 ├── data/                          ← base de datos H2 (se crea sola, no se versiona)
 └── src/
     ├── main/
@@ -156,17 +172,18 @@ Navegador (fetch + JSON) → TaskServlet → TaskValidator → TaskDao → H2
 - **Enums para estado y prioridad.** Evitan cadenas "mágicas" repartidas por el código. El texto que viaja en el JSON (`In Progress`) coincide con el de la base de datos.
 - **`PreparedStatement` en todas las consultas**, para evitar inyección SQL. Hay una prueba que guarda un intento de inyección como texto plano.
 - **H2 en modo archivo.** Cumple el requisito de persistencia sin instalar un motor externo. `AUTO_SERVER=TRUE` permite que la aplicación y un cliente de base de datos usen el mismo archivo a la vez. Para producción convendría PostgreSQL.
-- **La ruta de la base de datos se inyecta desde el `pom.xml`** (propiedad `tf.db.path`, apuntando a `./data` del proyecto). Cargo ejecuta Tomcat con una carpeta de trabajo dentro de `target`, por lo que una ruta relativa se borraría con `mvn clean`. Orden de prioridad: propiedad `tf.db.path` → variable de entorno `TF_DB_PATH` → `./data/taskflow`.
+- **La ruta de la base de datos se inyecta desde el `pom.xml`** (propiedad `tf.db.path`, apuntando a `./data` del proyecto). Cargo ejecuta Tomcat con una carpeta de trabajo dentro de `target/`, por lo que una ruta relativa se borraría con `mvn clean`. Orden de prioridad: propiedad `tf.db.path` → variable de entorno `TF_DB_PATH` → `./data/taskflow`.
 - **Carga explícita del driver (`Class.forName("org.h2.Driver")`).** Dentro de Tomcat, el driver vive en `WEB-INF/lib` y `DriverManager` no lo detecta por sí solo; sin esto la aplicación fallaba al arrancar con `No suitable driver`.
+- **Docker en dos etapas.** La primera (Maven + JDK 21) compila el WAR y la segunda (Tomcat 11 + JRE 21) solo contiene lo necesario para ejecutarlo, lo que reduce el tamaño de la imagen y deja fuera el código fuente y las herramientas de compilación. La base de datos vive en `/data`, un volumen, para que sobreviva a recrear el contenedor; su ruta se configura con la variable `TF_DB_PATH`, que `Database.java` ya soportaba. Las imágenes base son multiarquitectura (amd64 y arm64).
 - **Cargo para ejecutar con un solo comando.** El evaluador no necesita instalar ni configurar Tomcat.
 - **Frontend sin frameworks, dividido en HTML, CSS y JavaScript**, con rutas relativas (`api/tasks`). Funciona sin importar el nombre del servidor y desde otro dispositivo de la red, y no depende de internet (tipografía del sistema, sin librerías externas).
 - **`textContent` en lugar de `innerHTML`** al mostrar datos del usuario, para impedir ataques XSS.
 - **Se recarga la lista desde el servidor después de cada cambio**, en lugar de modificar la pantalla a mano, de modo que lo mostrado siempre coincide con lo guardado.
-- **Interfaz sobria y responsive.** Una columna en móvil y dos (formulario + lista) desde 820 px. Toda la paleta vive en variables CSS, lo que permitió añadir un **modo oscuro automático** (según la preferencia del sistema) sin duplicar estilos. Se verificó por cálculo que los pares de colores de texto cumplen el contraste mínimo de WCAG (4,5:1) en ambos modos.
-- **El color comunica información.** La prioridad se indica con una franja a la izquierda de cada fila (y también con texto, para no depender solo del color) y el estado con una etiqueta de color que a la vez es el selector para cambiarlo.
-- **Retroalimentación al usuario.** Validación del título junto al propio campo, contadores de caracteres, avisos breves al crear, editar o eliminar, y mensajes de error que explican qué falló. La confirmación de borrado se hace dentro de la fila, con el foco en la opción segura (Cancelar), en lugar del cuadro del navegador.
-- **Accesibilidad básica:** foco visible para teclado, `Escape` cancela la edición, atributos ARIA en filtros y errores, y se respeta la preferencia de movimiento reducido.
-- **El formulario conserva lo escrito si el servidor rechaza los datos**, para que se pueda corregir sin volver a teclear, y deshabilita el botón mientras guarda para evitar envíos dobles.
+- **Interfaz de aplicación, sobria y responsive.** Barra superior de marca, lista tipo tabla (tarea, prioridad, estado, fecha y acciones) que en móvil se apila fila por fila, y el formulario en una ventana emergente (`<dialog>` nativo) que sirve para crear y para editar. Toda la paleta vive en variables CSS, lo que permitió añadir un **modo oscuro automático** (según la preferencia del sistema) sin duplicar estilos. Se verificó por cálculo que los pares de colores de texto cumplen el contraste mínimo de WCAG (4,5:1) en ambos modos.
+- **El color comunica información, nunca sola.** La prioridad se indica con un punto de color más su texto, y el estado con una etiqueta de color que a la vez es el selector para cambiarlo.
+- **Retroalimentación al usuario.** Validación del título junto al propio campo, contadores de caracteres, avisos breves al crear, editar o eliminar, y mensajes de error que explican qué falló (dentro de la ventana si está abierta). La confirmación de borrado se hace dentro de la fila, con el foco en la opción segura (Cancelar), en lugar del cuadro del navegador. Hay un estado vacío con invitación a crear la primera tarea.
+- **Accesibilidad básica:** el `<dialog>` nativo gestiona el foco y se cierra con `Escape`; foco visible para teclado; botones de icono con nombre accesible; atributos ARIA en filtros y errores; y se respeta la preferencia de movimiento reducido.
+- **La ventana del formulario conserva lo escrito si el servidor rechaza los datos**, para que se pueda corregir sin volver a teclear, y deshabilita el botón mientras guarda para evitar envíos dobles. Un clic en el fondo oscuro solo la cierra si el clic empezó y terminó allí, para no perder el texto al soltar el ratón fuera después de seleccionar.
 - **`createdAt` como texto ISO-8601.** Evita problemas de Gson con las clases `java.time` en Java 17+.
 
 ---
@@ -192,6 +209,7 @@ Navegador (fetch + JSON) → TaskServlet → TaskValidator → TaskDao → H2
 - [ ] Indicadores o estadísticas de tareas *(opcional)*
 - [ ] Pruebas automatizadas de los servlets y del frontend (hoy se cubren indirectamente con las pruebas del validador y el DAO, y manualmente)
 - [ ] Paginación del listado
+- [ ] Ejecutar el contenedor con un usuario sin privilegios (hoy usa el usuario por defecto de la imagen)
 - [ ] Autenticación (el reto no la exige)
 - [ ] Credenciales de base de datos seguras para producción (hoy usa `sa` sin contraseña, solo apto para desarrollo local)
 

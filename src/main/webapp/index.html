@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,13 +12,13 @@
 <header class="topbar">
     <div class="container topbar-inner">
         <svg class="logo" width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
-            <rect width="32" height="32" rx="8" fill="currentColor"/>
+            <rect width="32" height="32" rx="8" fill="#4f74d9"/>
             <path d="M9 16.5l4.5 4.5L23 11.5" fill="none" stroke="#fff" stroke-width="3"
                   stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <div>
             <h1>TaskFlow</h1>
-            <p>Tareas del equipo</p>
+            <p>Team task management</p>
         </div>
     </div>
 </header>
@@ -28,83 +28,111 @@
     <!-- Errores del servidor o de conexión -->
     <div id="error" class="alert" role="alert" hidden>
         <span id="error-text"></span>
-        <button type="button" id="error-close" aria-label="Cerrar mensaje">&times;</button>
+        <button type="button" id="error-close" aria-label="Dismiss message">&times;</button>
     </div>
 
-    <div class="layout">
+    <div class="page-head">
+        <h2 id="list-title">Tasks <span id="count" class="count" hidden></span></h2>
 
-        <!-- ===== Formulario: sirve para crear y para editar ===== -->
-        <section class="panel" aria-labelledby="form-title">
-            <h2 id="form-title">Nueva tarea</h2>
+        <button type="button" id="new-btn" class="btn btn-primary btn-with-icon">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"
+                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M8 3v10M3 8h10"/>
+            </svg>
+            New task
+        </button>
+    </div>
 
-            <!-- novalidate: la validación la hace app.js para mostrar el mensaje junto al campo -->
-            <form id="task-form" novalidate>
-                <input type="hidden" id="task-id">
+    <div class="filters" role="group" aria-label="Filter by status">
+        <button type="button" class="chip is-active" data-status="" aria-pressed="true">All</button>
+        <button type="button" class="chip" data-status="Pending" aria-pressed="false">Pending</button>
+        <button type="button" class="chip" data-status="In Progress" aria-pressed="false">In Progress</button>
+        <button type="button" class="chip" data-status="Completed" aria-pressed="false">Completed</button>
+    </div>
 
-                <div class="field" id="title-field">
-                    <div class="label-row">
-                        <label for="title">Título <span class="req" aria-hidden="true">*</span></label>
-                        <span class="counter" id="title-count" aria-hidden="true">0/200</span>
-                    </div>
-                    <input type="text" id="title" maxlength="200" autocomplete="off" aria-describedby="title-error">
-                    <p class="field-error" id="title-error" hidden></p>
+    <!-- ===== Listado ===== -->
+    <div class="card">
+        <div id="list-head" class="list-head" aria-hidden="true" hidden>
+            <span>Task</span>
+            <span>Priority</span>
+            <span>Status</span>
+            <span>Created</span>
+            <span></span>
+        </div>
+
+        <ul id="task-list" class="task-list">
+            <li class="empty">Loading tasks…</li>
+        </ul>
+    </div>
+
+</main>
+
+<!-- ===== Ventana del formulario: sirve para crear y para editar ===== -->
+<dialog id="task-dialog" aria-labelledby="form-title">
+    <!-- novalidate: la validación la hace app.js para mostrar el mensaje junto al campo -->
+    <form id="task-form" novalidate>
+        <input type="hidden" id="task-id">
+
+        <div class="dialog-head">
+            <h2 id="form-title">New task</h2>
+            <button type="button" id="dialog-close" class="icon-btn" aria-label="Close" title="Close">
+                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false"
+                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <path d="M4 4l8 8M12 4l-8 8"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="dialog-body">
+            <div id="form-error" class="alert" role="alert" hidden>
+                <span id="form-error-text"></span>
+            </div>
+
+            <div class="field" id="title-field">
+                <div class="label-row">
+                    <label for="title">Title <span class="req" aria-hidden="true">*</span></label>
+                    <span class="counter" id="title-count" aria-hidden="true">0/200</span>
+                </div>
+                <input type="text" id="title" maxlength="200" autocomplete="off"
+                       aria-describedby="title-error" autofocus>
+                <p class="field-error" id="title-error" hidden></p>
+            </div>
+
+            <div class="field">
+                <div class="label-row">
+                    <label for="description">Description</label>
+                    <span class="counter" id="description-count" aria-hidden="true">0/1000</span>
+                </div>
+                <textarea id="description" rows="3" maxlength="1000"></textarea>
+            </div>
+
+            <div class="field-row">
+                <div class="field">
+                    <label for="priority">Priority</label>
+                    <select id="priority">
+                        <option value="Low">Low</option>
+                        <option value="Medium" selected>Medium</option>
+                        <option value="High">High</option>
+                    </select>
                 </div>
 
                 <div class="field">
-                    <div class="label-row">
-                        <label for="description">Descripción</label>
-                        <span class="counter" id="description-count" aria-hidden="true">0/1000</span>
-                    </div>
-                    <textarea id="description" rows="3" maxlength="1000"></textarea>
-                </div>
-
-                <div class="field-row">
-                    <div class="field">
-                        <label for="priority">Prioridad</label>
-                        <select id="priority">
-                            <option value="Low">Low</option>
-                            <option value="Medium" selected>Medium</option>
-                            <option value="High">High</option>
-                        </select>
-                    </div>
-
-                    <div class="field">
-                        <label for="status">Estado</label>
-                        <select id="status">
-                            <option value="Pending">Pending</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Completed">Completed</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-actions">
-                    <button type="submit" id="submit-btn" class="btn btn-primary">Crear tarea</button>
-                    <button type="button" id="cancel" class="btn btn-secondary" hidden>Cancelar</button>
-                </div>
-            </form>
-        </section>
-
-        <!-- ===== Listado ===== -->
-        <section aria-labelledby="list-title">
-            <div class="list-header">
-                <h2 id="list-title">Tareas <span id="count" class="count" hidden></span></h2>
-
-                <div class="filters" role="group" aria-label="Filtrar por estado">
-                    <button type="button" class="chip is-active" data-status="" aria-pressed="true">Todas</button>
-                    <button type="button" class="chip" data-status="Pending" aria-pressed="false">Pending</button>
-                    <button type="button" class="chip" data-status="In Progress" aria-pressed="false">In Progress</button>
-                    <button type="button" class="chip" data-status="Completed" aria-pressed="false">Completed</button>
+                    <label for="status">Status</label>
+                    <select id="status">
+                        <option value="Pending">Pending</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                    </select>
                 </div>
             </div>
+        </div>
 
-            <ul id="task-list" class="task-list">
-                <li class="empty">Cargando tareas…</li>
-            </ul>
-        </section>
-
-    </div>
-</main>
+        <div class="dialog-foot">
+            <button type="button" id="cancel" class="btn btn-secondary">Cancel</button>
+            <button type="submit" id="submit-btn" class="btn btn-primary">Create task</button>
+        </div>
+    </form>
+</dialog>
 
 <!-- Aviso breve tras crear, editar o eliminar -->
 <div id="toast" class="toast" role="status" hidden></div>
