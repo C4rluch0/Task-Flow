@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.example</groupId>
+    <artifactId>TaskFlow</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>war</packaging>
+    <name>TaskFlow</name>
+
+    <properties>
+        <!-- Compila para Java 21 (funciona con un JDK 21 o superior) -->
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <cargo.version>1.10.20</cargo.version>
+    </properties>
+
+    <dependencies>
+        <!-- API de servlets: Tomcat ya la incluye, por eso es "provided" -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>6.1.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Base de datos H2 y su driver JDBC -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>2.3.232</version>
+        </dependency>
+
+        <!-- Conversión de objetos Java a JSON y viceversa -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.11.0</version>
+        </dependency>
+
+        <!-- Pruebas automatizadas -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.11.4</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <version>RELEASE</version>
+            <scope>compile</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <!-- El WAR se llamará TaskFlow.war, por eso la URL será /TaskFlow/ -->
+        <finalName>TaskFlow</finalName>
+
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.4.0</version>
+                <configuration>
+                    <!-- No usamos web.xml: los servlets se registran con anotaciones -->
+                    <failOnMissingWebXml>false</failOnMissingWebXml>
+                </configuration>
+            </plugin>
+
+            <!-- Descarga y arranca Tomcat 11 automáticamente: mvn package cargo:run -->
+            <plugin>
+                <groupId>org.codehaus.cargo</groupId>
+                <artifactId>cargo-maven3-plugin</artifactId>
+                <version>${cargo.version}</version>
+                <configuration>
+                    <container>
+                        <containerId>tomcat11x</containerId>
+                        <!-- Propiedad que lee Database.java: guarda la BD en ./data del proyecto,
+                             así sobrevive a "mvn clean" -->
+                        <systemProperties>
+                            <tf.db.path>${project.basedir}/data/taskflow</tf.db.path>
+                        </systemProperties>
+                    </container>
+                    <configuration>
+                        <properties>
+                            <cargo.servlet.port>8080</cargo.servlet.port>
+                        </properties>
+                    </configuration>
+                    <deployables>
+                        <deployable>
+                            <type>war</type>
+                            <properties>
+                                <context>/TaskFlow</context>
+                            </properties>
+                        </deployable>
+                    </deployables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
