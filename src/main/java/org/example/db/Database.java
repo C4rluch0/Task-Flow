@@ -75,4 +75,12 @@ public class Database {
             throw new IllegalStateException("Could not initialize the database", e);
         }
     }
+
+    public static String url() {
+        return URL;
+    }
+
+    public static String user() {
+        return USER;
+    }
 }
