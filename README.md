@@ -342,4 +342,4 @@ Esta sección describe el proceso original documentado por el autor. Los resulta
 
 ## Demostración
 
-Video (máximo 5 minutos): *(agregar enlace)*
+Video de demostración: *https://drive.google.com/file/d/1VwfaX8p0xeQVcQff-hDn745UUiDmAfD-/view?usp=sharing*
