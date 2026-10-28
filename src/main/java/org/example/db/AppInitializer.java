@@ -14,5 +14,6 @@ public class AppInitializer implements ServletContextListener {
     @Override
     public void contextInitialized(ServletContextEvent sce) {
         Database.init();
+        H2ConsoleSetup.register(sce.getServletContext());
     }
 }
