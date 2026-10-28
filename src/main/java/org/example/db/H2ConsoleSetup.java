@@ -42,7 +42,7 @@ public final class H2ConsoleSetup {
         return isEnabled(value);
     }
 
-    static boolean isEnabled(String value) {
+    public static boolean isEnabled(String value) {
         return value == null || !value.trim().equalsIgnoreCase("false");
     }
 
@@ -50,7 +50,7 @@ public final class H2ConsoleSetup {
         register(context, isEnabled());
     }
 
-    static void register(ServletContext context, boolean enabled) {
+    public static void register(ServletContext context, boolean enabled) {
         if (!enabled) {
             context.log("H2 web console is disabled (TF_H2_CONSOLE=false)");
             return;
@@ -84,7 +84,7 @@ public final class H2ConsoleSetup {
      * Escribe el archivo de conexiones guardadas que lee la consola de H2.
      * Cada conexión se guarda con el formato: nombre|driver|url|usuario
      */
-    static Path writeSettings(Path dir, String jdbcUrl, String user) throws IOException {
+    public static Path writeSettings(Path dir, String jdbcUrl, String user) throws IOException {
         Properties settings = new Properties();
         settings.setProperty("0", String.join("|", CONNECTION_NAME, "org.h2.Driver", jdbcUrl, user));
 
