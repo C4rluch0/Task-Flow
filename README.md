@@ -149,24 +149,7 @@ La funcionalidad se encuentra **habilitada por defecto** salvo que se establezca
 | Usuario por defecto | `sa` | `sa` |
 | Contraseña por defecto | *(vacía)* | *(vacía)* |
 
-**Limitación conocida:** `AppInitializer` está anotado con `@WebListener` y llama a `ServletContext.addServlet()` durante su inicialización. Tomcat puede impedir el registro dinámico en ese contexto; por tanto, **la dirección `/h2-console/` no se debe considerar garantizada** con esta versión. Si muestra HTTP 404, comprueba `docker compose logs -f` o el registro de Tomcat buscando `H2 web console could not be started`, y revisa el mecanismo de registro (por ejemplo, un `ServletContainerInitializer` o una declaración válida del servlet). Las pruebas actuales usan un contexto simulado y **no prueban el despliegue real en Tomcat**.
-
-Por seguridad, la consola H2 está pensada para **desarrollo y evaluación en un entorno confiable**. El código establece `webAllowOthers`, por lo que no debe exponerse públicamente sin controles de acceso. Es recomendable deshabilitarla fuera del entorno de desarrollo.
-
-### Opciones de conexión
-
-`Database.java` admite estas configuraciones:
-
-| Configuración | Función | Valor predeterminado |
-|---|---|---|
-| `-Dtf.db.path` | Ruta del archivo H2, tiene prioridad sobre `TF_DB_PATH` | Definida por Cargo durante el arranque local |
-| `TF_DB_PATH` | Ruta del archivo H2 cuando no existe `tf.db.path` | `./data/taskflow` (Docker usa `/data/taskflow`) |
-| `TF_DB_USER` | Usuario H2 | `sa` |
-| `TF_DB_PASSWORD` | Contraseña H2 | Vacía |
-| `TF_H2_CONSOLE` | `false` deshabilita la consola web | Habilitada, si no se especifica `false` |
-| `-Dtf.h2.console` | Propiedad Java que controla la consola y tiene prioridad sobre la variable | Sin definir |
-
-Se puede abrir H2 con un cliente JDBC como IntelliJ IDEA (*Database → Data Source → H2*) usando la **ruta del entorno en el que se está ejecutando la base**. La ruta `/data/taskflow` existe dentro del contenedor, no necesariamente en el equipo anfitrión.
+---
 
 ## Pruebas automatizadas
 
@@ -199,14 +182,6 @@ mvn clean verify
 ```
 
 Los informes quedan en `target/surefire-reports/`. Las pruebas `TaskDaoTest` utilizan una base independiente bajo `target/test-db` y no deberían modificar los datos de `data/`.
-
-**Resultados previos incluidos en el ZIP original:** los informes de `target/surefire-reports` registran **39 pruebas ejecutadas, 0 fallos, 0 errores y 0 omitidas**. Esta revisión del README no volvió a ejecutar Maven, así que esas cifras corresponden a los informes existentes.
-
-**Advertencia sobre Maven:** el `pom.xml` no fija explícitamente una versión de `maven-surefire-plugin`. Si en otro equipo aparece `Tests run: 0` o no se descubren los métodos de JUnit 5, configura una versión reciente de Surefire (3.x) y vuelve a ejecutar las pruebas.
-
-### GitHub Actions (integración continua)
-
-**El ZIP entregado no incluye ningún archivo `.github/workflows/*.yml`.** Por tanto, no se puede afirmar que las pruebas se ejecuten automáticamente en GitHub con esta versión. Si agregas al repositorio un workflow que ejecute `mvn -B clean verify` con Java 21, las pruebas podrán lanzarse en los eventos `push`, `pull_request` o manualmente, según su configuración. Subir un workflow a GitHub no requiere cambiar el código Java.
 
 ---
 
@@ -347,31 +322,6 @@ Navegador (fetch + JSON) → TaskServlet → TaskValidator → TaskDao → H2
 - [ ] Ejecutar el contenedor con un usuario sin privilegios (hoy usa el usuario por defecto de la imagen)
 - [ ] Autenticación (el reto no la exige)
 - [ ] Credenciales de base de datos seguras para producción (hoy usa `sa` sin contraseña, solo apto para desarrollo local)
-
----
-
-## Solución de problemas
-
-| Síntoma | Causa probable | Solución |
-|---|---|---|
-| `mvn` no se reconoce | Maven no está instalado o no está en el `PATH` | Instalar Maven 3.9+ o usar el Maven integrado del IDE |
-| Error `Address already in use` | El puerto 8080 está ocupado | Cerrar el otro programa o un Tomcat anterior |
-| `404` en `/TaskFlow/` | La aplicación no se desplegó o el contexto no coincide | Revisar el despliegue y los registros de Tomcat |
-| `404` en `/TaskFlow/h2-console/` | No se registró el servlet H2 o la consola está deshabilitada | Revisar `TF_H2_CONSOLE`, los logs y el registro dinámico desde `@WebListener` |
-| `Cannot resolve symbol H2ConsoleSetup` | Paquete/importación incorrectos | La clase principal está en `org.example.db`; la clase de prueba la importa desde ese paquete |
-| `Wrong user name or password` | Usuario o contraseña distintos de los utilizados al crear la base | Revisar `TF_DB_USER`, `TF_DB_PASSWORD` y la conexión. **No borres el archivo** sin hacer una copia de seguridad |
-| `Database may be already in use` | Otro proceso abrió el archivo sin `AUTO_SERVER=TRUE` | Usar la URL con `;AUTO_SERVER=TRUE` |
-
----
-
-## Compartir el proyecto
-
-Hay dos formas de distribuir TaskFlow:
-
-1. **Código fuente por GitHub:** comparte el repositorio con `src/`, `Dockerfile`, `docker-compose.yml`, `pom.xml` y este README para que otras personas puedan revisar y modificar el código. No publiques archivos locales `data/*.mv.db` / `data/*.trace.db` (pueden contener información privada). `data/` y los archivos H2 figuran en `.gitignore`.
-2. **Aplicación lista para ejecutar desde Docker Hub:** comparte https://hub.docker.com/r/c4rluch0/taskflow y el comando `docker run` de la sección [Ejecutar TaskFlow desde Docker Hub](#ejecutar-taskflow-desde-docker-hub-sin-clonar-github). No hace falta clonar GitHub ni tener los archivos fuente.
-
-Los datos persistidos en el volumen Docker son locales a cada equipo: ni clonar GitHub ni descargar la imagen de Docker Hub copia las tareas guardadas por otra persona.
 
 ---
 
